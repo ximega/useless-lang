@@ -1,0 +1,26 @@
+_indent: 4
+
+_links:
+    mdi, mdg
+
+_consts:
+    1 [_print_hw] char[] "Hello, World!\n" // std is a owner of this value, other owners might be other modules
+    4 [_main] char "\n"
+
+_pre:
+    2 [_main] int 0
+    5 [_main] bool False
+
+_stdin:
+    3 [std] int
+
+$_print_hw [_main]:
+    stdout ~1
+
+_main [std] % (&3):
+    <mdi> if 3 (~2 < ~3) ->5
+    inc ~2 1
+    stdout ~5
+    stdout ~4
+    call _print_hw
+    goto <mdi>
