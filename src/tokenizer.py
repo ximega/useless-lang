@@ -1,5 +1,6 @@
-from typing import Literal, Self
+import re
 import pprint # type: ignore
+from typing import Literal, Self
 
 from rules import *
 from errors import (
@@ -120,7 +121,7 @@ class Token:
         self.subtokens: list[Token] = []
 
     def __repr__(self) -> str:
-        return f"{self.line_index=}, {self.line=}\n{self.action=}, {self.owner=}, {self.keyword=}, {self.link=}, {self.arguments=}, {len(self.subtokens)} subtokens"
+        return f"line_index={self.line_index}, line={self.line}\naction={self.action}, owner={self.owner}, keyword={self.keyword}, link={self.link}, arguments={self.arguments}, {len(self.subtokens)} subtokens\n"
     
     def set_link(self, link: str) -> Self:
         if self.action != Action.Instruction:
@@ -314,21 +315,22 @@ class Tokenizer:
                     
                     try:
                         # removing from args[1] (which is supposed to be just owner)
-                        if args[1][-1] == ":":
-                            args[1] = args[1][0:-1]
+                        try:
+                            if args[1][-1] == ":":
+                                args[1] = args[1][0:-1]
 
-                        if args[1][0] != "[" or args[1][-1] != "]":
-                            raise SyntaxException(SYNTAX_ERR, f"Custom space initialization must follow with an owner: {space_name}", f"{line_index}| {line}", highlight_errored_word(line, line_index, space_name[-1], -1))
+                            if args[1][0] != "[" or args[1][-1] != "]":
+                                raise SyntaxException(SYNTAX_ERR, f"Custom space initialization must follow with an owner: {space_name}", f"{line_index}| {line}", highlight_errored_word(line, line_index, space_name[-1], -1))
+                        except IndexError:
+                            raise SyntaxError(SYNTAX_ERR, f"Missing owner", f"{line_index}| {line}l", highlight_errored_word(line, line_index, chars[len(space_name)], -1))
+                        
                     except IndexError:
                         raise SyntaxException(SYNTAX_ERR, f"Custom space initialization must follow with an owner: {space_name}", f"{line_index}| {line}", highlight_errored_word(line, line_index, space_name[-1], -1))
 
                     owner_name_str: str = args[1][1:-1]
                     owner_name: str | Literal[ReservedSpace.Main] = f"{owner_name_str}"
                     
-                    if owner_name_str.startswith("_"):
-                        if owner_name != "_main":
-                            raise OwnershipException(OWNERSHIP_ERR, f"Can not set reserved space {owner_name_str} as owner", f"{line_index}| {line}", highlight_errored_word(line, line_index, owner_name_str, -1))
-                        
+                    if owner_name_str == "_main":
                         owner_name = ReservedSpace.Main
                     else:
                         owner_name = owner_name_str
@@ -358,7 +360,71 @@ class Tokenizer:
 
                 # handling definitions and instructions
                 elif line.startswith(' '*indentation):
-                    pass
+                    if line[indentation] == ' ': 
+                        raise SyntaxException(SYNTAX_ERR, f"Invalid indentation, expected {indentation}", f"{line_index}| {line}", highlight_errored_word(line, line_index, ' ', indentation))
+
+                    # handling _consts rs
+                    if cur_space == ReservedSpace.Consts:
+                        if len(args) < 4: 
+                            raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a constant, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+
+                        const_ref_str: str = args[0]
+                        if not const_ref_str.isdigit():
+                            raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _const", f"{line_index}| {line}", highlight_errored_word(line, line_index, const_ref_str, 0))
+                        
+                        const_owner: str | Literal[ReservedSpace.Main] = args[1]
+                        if const_owner[0] != '[' or const_owner[-1] != ']':
+                            raise SyntaxException(SYNTAX_ERR, f"Expected owner of constant", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+                        else:
+                            const_owner = const_owner[1:-1]
+                        # reset to ReservedSpace.Main in case the string given is _main
+                        if const_owner == "_main": 
+                            const_owner = ReservedSpace.Main
+                        
+                        const_type_str: str = args[2]
+                        const_type: Type | None = None
+                        try:
+                            const_type = get_type_from_str(const_type_str)
+                        except RulesBreak as exc:
+                            raise RulesBreak(RULES_BREAK, exc.args[1], f"{line_index}| {line}", highlight_errored_word(line, line_index, const_type_str, 0)) from exc
+
+                        const_value: str = ""
+                        if const_type in (Type.Int, Type.Char, Type.Bool):
+                            const_value = args[3]
+
+                            if len(args) > 4: 
+                                raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[4], -1))
+                            
+                            match const_type:
+                                case Type.Int:
+                                    if not args[3].isdigit():
+                                        raise SyntaxException(SYNTAX_ERR, f"Incorrect value set for int", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                case Type.Bool:
+                                    if args[3] not in ('True', 'False', 'Null', 'Vague'):
+                                        raise SyntaxException(SYNTAX_ERR, f"Unknown bool value", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                case Type.Char:
+                                    if args[3][0] != "\'" or args[3][-1] != "\'":
+                                        raise SyntaxException(SYNTAX_ERR, f"Invalid char declaration", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+
+                        spaces[ReservedSpace.Consts].set_subtokens([Token(
+                            Action.Defining,
+                            const_owner,
+                            Keyword.VarSet,
+                            [
+                                (const_type, const_value)
+                            ],
+                            line_index,
+                            line
+                        )])
+
+                    elif cur_space == ReservedSpace.Pre:
+                        pass
+
+                    elif cur_space == ReservedSpace.Stdin:
+                        pass
+
+                    else:
+                        pass
 
                 else:
                     if line[0] == " ": 

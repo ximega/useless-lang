@@ -1,1 +1,7 @@
-$_print_hw [:abc]:
+_indent: 2
+
+_links:
+  mdi, mdg
+
+_consts:
+  0 [_main] bool Vague

@@ -4,7 +4,7 @@ import string
 from errors import RulesBreak, RULES_BREAK
 
 
-ALLOWED_CHARS: str = string.ascii_letters + string.digits + "$_,[]\\!?~<>-=%\n: \"()&"
+ALLOWED_CHARS: str = string.ascii_letters + string.digits + "$_,[]\\!?~<>-=%\n: \"\'()&"
 
 MAX_VAR = 65535
 
@@ -34,7 +34,19 @@ class Type(Enum):
     Bool = auto()
     IntArray = auto()
     String = auto() # == char[]
-    BoolArray = auto()
+
+def get_type_from_str(tp: str) -> Type:
+    pairs: dict[str, Type] = {
+        'int': Type.Int,
+        'char': Type.Char,
+        'bool': Type.Bool,
+        'int[]': Type.IntArray,
+        'char[]': Type.String,
+    }
+    try:
+        return pairs[tp]
+    except KeyError as exc:
+        raise RulesBreak(RULES_BREAK, f"Not a type: {tp}", "", "") from exc
 
 class ReservedSpace(Enum):
     Indent = auto()
