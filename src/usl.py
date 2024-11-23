@@ -3,7 +3,8 @@
 
 import sys, pprint
 
-from tokenizer import Tokenizer, Pointer
+from rules import RulesBreak
+from tokenizer import Tokenizer, Pointer, Token, SyntaxException, TokenizerException
 
 
 def main() -> None:
@@ -11,12 +12,29 @@ def main() -> None:
 
     file_name: str = sys.argv[1]
 
-    with open(file_name, "r+") as file:
-        lines = file.read().split('\n')
+    if not file_name.endswith(".usl"):
+        print("Not a .usl file")
+        return
 
-    tokenizer: Tokenizer = Tokenizer(Pointer(lines))
+    try:
+        with open(file_name, "r+") as file:
+            lines = file.read().split('\n')
 
-    pprint.pprint(tokenizer.parse_to_tokens())
+        tokenizer: Tokenizer = Tokenizer(Pointer(lines))
+
+        tokens: list[Token] = []
+
+        try:
+            tokens = tokenizer.parse_to_tokens()
+        except (SyntaxException, RulesBreak, TokenizerException) as exc:
+            print(exc.args[0])
+            return
+        
+        pprint.pprint(tokens)
+
+    except FileNotFoundError as exc:
+        print(exc.args[1] + ": " + file_name)
+        return
 
 
 if __name__ == "__main__":

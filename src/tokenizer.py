@@ -16,16 +16,23 @@ class SyntaxException(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
-def highlight_errored_word(line: str, match_word: str, occur_index: int) -> str:
-    matched: list[int] = []
-    for x in line.split(' '):
-        if x == match_word:
-            matched.append(list(line).index(match_word))
+def highlight_errored_word(line: str, line_index: int, match_word: str, occur_index: int) -> str:
+    matched: list[int] = [] # indexes of matched
+    chars: list[str] = list(line)
+    mchars: list[str] = list(match_word)
+    for index, char in enumerate(chars):
+        if char == match_word[0]:
+            all_equal = True
+            for jndex, mchar in enumerate(mchars):
+                if mchar != chars[index+jndex]:
+                    all_equal = False
+            if all_equal:
+                matched.append(index)
 
     if len(matched) == 0: 
-        raise TokenizerException(f"There is no word to match, to be highlighted\n\n{line}")
+        raise TokenizerException(f"There is no word to match, to be highlighted\n\n{line=}, {match_word=}")
     
-    return " "*(matched[occur_index]) + "^"*len(match_word)    
+    return " "*(matched[occur_index] + 2 + len(str(line_index))) + "^"*len(match_word)    
 
 class Pointer:
     __instanced = False
@@ -97,7 +104,7 @@ class Token:
         if self.action not in (Action.Instruction, Action.Spacing):
             raise TokenizerException(f"Cannot set subtokens for non-instruction or non-spacing\n\n{self.line_index}| {self.line}")
         if (self.action == Action.Instruction) and (self.keyword not in ALLOWED_SUBTOKEN_INSTRUCTION):
-            raise TokenizerException(f"Cannot include subtokens under {get_str_from_keyword(self.keyword)}\n\n{self.line_index}| {self.line}\n{highlight_errored_word(self.line, get_str_from_keyword(self.keyword), 0)}")
+            raise TokenizerException(f"Cannot include subtokens under {get_str_from_keyword(self.keyword)}\n\n{self.line_index}| {self.line}\n{highlight_errored_word(self.line, self.line_index, get_str_from_keyword(self.keyword), 0)}")
                     
         self.subtokens = subtokens
         return self
@@ -106,7 +113,7 @@ class Token:
         if self.action not in (Action.Instruction, Action.Spacing):
             raise TokenizerException(f"Cannot add subtokens for non-instruction or non-spacing\n\n{self.line_index}| {self.line}")
         if (self.action == Action.Instruction) and (self.keyword not in ALLOWED_SUBTOKEN_INSTRUCTION):
-            raise TokenizerException(f"Cannot include subtokens under {get_str_from_keyword(self.keyword)}\n\n{self.line_index}| {self.line}\n{highlight_errored_word(self.line, get_str_from_keyword(self.keyword), 0)}")
+            raise TokenizerException(f"Cannot include subtokens under {get_str_from_keyword(self.keyword)}\n\n{self.line_index}| {self.line}\n{highlight_errored_word(self.line, self.line_index, get_str_from_keyword(self.keyword), 0)}")
                     
         self.subtokens.extend(subtokens)
         return self 
@@ -137,25 +144,34 @@ class Tokenizer:
                 chars: list[str] = [x for x in list(line) if x != " "]
 
                 if line.startswith("_"): # reserved spaces
+                    space_name_listed: list[str] = []
+                    for char in chars:
+                        if char in (":", "%"): break
+                        space_name_listed.append(char)
+                    space_name: str = "".join(space_name_listed)
+
+                    if space_name not in ALL_RESERVED_SPACES_AS_STR:
+                        raise SyntaxException(f"Not a reserved space: {space_name}\n\n{line_index}| {line}\n{highlight_errored_word(line, line_index, space_name, 0)}")
+
                     if chars[-1] != ":" and line[0:len("_indent")] != "_indent":
                         occur_index: int = line.count(chars[-1]) - 1
-                        raise SyntaxException(f"A initialized space must end with a colon\n\n{line_index}| {line}\n{highlight_errored_word(line, chars[-1], occur_index)}")
+                        raise SyntaxException(f"A initialized space must end with a colon\n\n{line_index}| {line}\n{highlight_errored_word(line, line_index, chars[-1], occur_index)}")
 
                     # if it is _indent rs
                     if line.startswith("_indent"):
                         if chars[len("_indent")] != ":":
-                            raise SyntaxException(f"After _indent must come a colon\n\n{line_index}| {line}\n{highlight_errored_word(line, "t", 0)}")                     
+                            raise SyntaxException(f"Expected a colon after _indent\n\n{line_index}| {line}\n{highlight_errored_word(line, line_index, "t", 0)}")                     
                         
                         indent_val_: list[str] = chars[len("_indent")+1:]
                         indent_val: str = "".join(indent_val_)
                         if not indent_val.isdigit():
                             occur_index: int = line.count(indent_val) - 1
-                            raise SyntaxException(f"The value of _indent must be an integer\n\n{line_index}| {line}\n{highlight_errored_word(line, indent_val, occur_index)}")
+                            raise SyntaxException(f"The value of _indent must be an integer\n\n{line_index}| {line}\n{highlight_errored_word(line, line_index, indent_val, occur_index)}")
                         
                         indent: int = int(indent_val)
                         if indent not in ALLOWED_INDENTATIONS:
                             occur_index: int = line.count(indent_val) - 1
-                            raise SyntaxException(f"Indentation must be one of {", ".join([str(x) for x in ALLOWED_INDENTATIONS])}\n\n{line_index}| {line}\n{highlight_errored_word(line, indent_val, occur_index)}")
+                            raise SyntaxException(f"Indentation must be one of {", ".join([str(x) for x in ALLOWED_INDENTATIONS])}\n\n{line_index}| {line}\n{highlight_errored_word(line, line_index, indent_val, occur_index)}")
 
                         indentation = indent
 
@@ -170,14 +186,6 @@ class Tokenizer:
                             line
                         ))
                     else:
-                        space_name_listed: list[str] = []
-                        for char in chars:
-                            if char in (":", "%"): break
-                            space_name_listed.append(char)
-                        space_name: str = "".join(space_name_listed)
-
-                        if space_name not in ALL_RESERVED_SPACES_AS_STR:
-                            raise SyntaxException(f"Not a reserved space: {space_name}\n\n{line_index}| {line}\n{highlight_errored_word(line, space_name, 0)}")
                         
                         spaces.append(Token(
                             Action.Spacing,
