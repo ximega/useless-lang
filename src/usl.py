@@ -2,9 +2,11 @@
 
 
 import sys, pprint
+from termcolor import colored
 
 from rules import RulesBreak
-from tokenizer import Tokenizer, Pointer, Token, SyntaxException, TokenizerException
+from tokenizer import Tokenizer, Token, Pointer
+from errors import *
 
 
 def main() -> None:
@@ -20,17 +22,28 @@ def main() -> None:
         with open(file_name, "r+") as file:
             lines = file.read().split('\n')
 
-        tokenizer: Tokenizer = Tokenizer(Pointer(lines))
-
-        tokens: list[Token] = []
-
         try:
+            tokenizer: Tokenizer = Tokenizer(Pointer(lines))
+
+            tokens: list[Token] = []
+
             tokens = tokenizer.parse_to_tokens()
-        except (SyntaxException, RulesBreak, TokenizerException) as exc:
-            print("\n" + exc.args[0] + "\n")
+
+            pprint.pprint(tokens)
+        except (
+            SyntaxException,
+            OwnershipException,
+            DuplicationException,
+            TokenizerException,
+            RulesBreak,
+        ) as exc:
+            print(
+                '\n' +
+                colored(exc.args[0], "red", attrs=["bold"]) + ': ' + colored(exc.args[1], "red") + "\n\n" +
+                colored(exc.args[2], "white") + '\n' +
+                colored(exc.args[3], "magenta", attrs=["bold"])
+            )
             return
-        
-        pprint.pprint(tokens)
 
     except FileNotFoundError as exc:
         print(exc.args[1] + ": " + file_name)

@@ -6,7 +6,7 @@ _links:
     daa
 
 _consts:
-    1 [_print_hw] char[] "Hello, World!\n" // std is a owner of this value, other owners might be other modules
+    1 [_print_hw] char[] "Hello, World!\n" 
     4 [_main] char "\n"
 
 _pre:
@@ -14,7 +14,7 @@ _pre:
     5 [_main] bool False
 
 _stdin:
-    3 [std] int
+    3 [std] int // std is a owner of this value, other owners might be other modules
 
 $_print_hw [_main]:
     stdout ~1

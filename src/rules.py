@@ -1,10 +1,17 @@
 from enum import Enum, auto
 import string
 
-from errors import RulesBreak
+from errors import RulesBreak, RULES_BREAK
 
+
+ALLOWED_CHARS: str = string.ascii_letters + string.digits + "$_,[]\\!?~<>-=%\n: \"()&"
+
+MAX_VAR = 65535
 
 ALLOWED_LINK_CHARS: str = string.ascii_lowercase
+
+ALLOWED_RS_CHARS: str = string.ascii_letters + '_'
+ALLOWED_CUSTOM_SPACE_CHARS: str = ALLOWED_RS_CHARS + '$'
 
 LINK_CHAR_LEN = 3
 
@@ -49,7 +56,7 @@ def get_reserved_space_from_str(rs: str) -> ReservedSpace:
     try:
         return pairs[rs]
     except KeyError as exc:
-        raise RulesBreak(f"Not a reserved space: {rs}") from exc
+        raise RulesBreak(RULES_BREAK, f"Not a reserved space: {rs}", "", "") from exc
     
 def get_str_from_reserved_space(rs: ReservedSpace) -> str:
     pairs: dict[ReservedSpace, str] = {
@@ -78,7 +85,7 @@ class Keyword(Enum):
     StringOpen = auto() # "
     StringClose = auto() # "
     ReferenceDef = auto() # number that comes first inside _consts, _pre, _stdin
-    CustomSpaceDef = auto() # $
+    CustomSpaceDef = auto() # $_
     StdinArgumentInit = auto() # %
     StdinArgumentOpen = auto() # (
     StdioArgumentClose = auto() # )
@@ -114,7 +121,7 @@ def get_keyword_from_str(kw: str) -> Keyword:
     try:
         return pairs[kw]
     except KeyError as exc:
-        raise RulesBreak("Unknown keyword") from exc
+        raise RulesBreak(RULES_BREAK, "Unknown keyword", "", "") from exc
     
 def get_str_from_keyword(kw: Keyword) -> str:
     pairs: dict[Keyword, str] = {
