@@ -2,6 +2,8 @@ _indent: 4
 
 _links:
     mdi, mdg
+    ard, kdi, ljh
+    daa
 
 _consts:
     1 [_print_hw] char[] "Hello, World!\n" // std is a owner of this value, other owners might be other modules

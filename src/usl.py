@@ -27,7 +27,7 @@ def main() -> None:
         try:
             tokens = tokenizer.parse_to_tokens()
         except (SyntaxException, RulesBreak, TokenizerException) as exc:
-            print(exc.args[0])
+            print("\n" + exc.args[0] + "\n")
             return
         
         pprint.pprint(tokens)

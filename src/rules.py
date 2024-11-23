@@ -1,5 +1,10 @@
 from enum import Enum, auto
+import string
 
+from errors import RulesBreak
+
+
+ALLOWED_LINK_CHARS: str = string.ascii_lowercase
 
 LINK_CHAR_LEN = 3
 
@@ -12,9 +17,9 @@ ALL_RESERVED_SPACES_AS_STR: list[str] = [
 ALLOWED_INDENTATIONS: list[int] = [2, 4]
 DEFAULT_INDENTATION: int = 4
 
-class RulesBreak(Exception):
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
+THREE_LETTER_KEYWORDS: list[str] = [
+    "inc", "dec"
+]
 
 class Type(Enum):
     Int = auto()
@@ -79,6 +84,7 @@ class Keyword(Enum):
     StdioArgumentClose = auto() # )
     LinkOpen = auto() # <
     LinkClose = auto() # >
+    LinkDef = auto() # actually an empty symbol. Just for tokenizer to understand
     ComprehensionOpen = auto() # (
     ComprehensionClose = auto() # )
     Refer = auto() # ~
