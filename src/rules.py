@@ -4,7 +4,7 @@ import string
 from errors import RulesBreak, RULES_BREAK
 
 
-ALLOWED_CHARS: str = string.ascii_letters + string.digits + "$_,[]\\!?~<>-=%\n: \"\'()&"
+ALLOWED_CHARS: str = string.ascii_letters + string.digits + f"$_,[]\\!?~<>-=%\n: \"\'()&{{}}"
 
 MAX_VAR = 65535
 
@@ -92,8 +92,8 @@ class Keyword(Enum):
     SpaceNameEnd = auto() # :
     OwnershipOpen = auto() # [
     OwnershipClose = auto() # ]
-    ArrayOpen = auto() # [
-    ArrayClose = auto() # ]
+    ArrayOpen = auto() # {
+    ArrayClose = auto() # }
     StringOpen = auto() # "
     StringClose = auto() # "
     ReferenceDef = auto() # number that comes first inside _consts, _pre, _stdin

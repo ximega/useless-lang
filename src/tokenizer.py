@@ -1,5 +1,4 @@
-import re
-import pprint # type: ignore
+import pprint, re # type: ignore
 from typing import Literal, Self
 
 from rules import *
@@ -109,7 +108,7 @@ class Pointer:
         return items
     
 class Token:
-    def __init__(self, action: Action, owner: str | ReservedSpace, keyword: Keyword, arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str], line_index: int, line: str) -> None:
+    def __init__(self, action: Action, owner: str | ReservedSpace, keyword: Keyword, arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str | tuple[Keyword, int]], line_index: int, line: str) -> None:
         self.line_index: int = line_index
         self.line: str = line
             
@@ -117,8 +116,14 @@ class Token:
         self.owner: str | ReservedSpace = owner
         self.keyword: Keyword = keyword
         self.link: str | None = None
-        self.arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str] = arguments
+        self.arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str | tuple[Keyword, int]] = arguments
         self.subtokens: list[Token] = []
+
+        # tuple[Type, str] -> variable type with its string annotation
+        # tuple[Keyword, int] -> when referencing variable with reference key (~)
+        # Keyword -> additional operations
+        # ReservedSpace -> when defining spaces
+        # str -> for other cases
 
     def __repr__(self) -> str:
         return f"line_index={self.line_index}, line={self.line}\naction={self.action}, owner={self.owner}, keyword={self.keyword}, link={self.link}, arguments={self.arguments}, {len(self.subtokens)} subtokens\n"
@@ -370,7 +375,7 @@ class Tokenizer:
 
                         const_ref_str: str = args[0]
                         if not const_ref_str.isdigit():
-                            raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _const", f"{line_index}| {line}", highlight_errored_word(line, line_index, const_ref_str, 0))
+                            raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _const at reference", f"{line_index}| {line}", highlight_errored_word(line, line_index, const_ref_str, 0))
                         
                         const_owner: str | Literal[ReservedSpace.Main] = args[1]
                         if const_owner[0] != '[' or const_owner[-1] != ']':
@@ -388,41 +393,209 @@ class Tokenizer:
                         except RulesBreak as exc:
                             raise RulesBreak(RULES_BREAK, exc.args[1], f"{line_index}| {line}", highlight_errored_word(line, line_index, const_type_str, 0)) from exc
 
-                        const_value: str = ""
-                        if const_type in (Type.Int, Type.Char, Type.Bool):
-                            const_value = args[3]
+                        # if the value was referenced with ~
+                        # then specific path to add will be executed
+                        # so i mean the following
+                        if args[3].startswith('~'):
+                            reference_value_str: str = args[3][1:]
+                            reference_value_int: int = 0
 
                             if len(args) > 4: 
                                 raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[4], -1))
                             
-                            match const_type:
-                                case Type.Int:
-                                    if not args[3].isdigit():
-                                        raise SyntaxException(SYNTAX_ERR, f"Incorrect value set for int", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
-                                case Type.Bool:
-                                    if args[3] not in ('True', 'False', 'Null', 'Vague'):
-                                        raise SyntaxException(SYNTAX_ERR, f"Unknown bool value", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
-                                case Type.Char:
-                                    if args[3][0] != "\'" or args[3][-1] != "\'":
-                                        raise SyntaxException(SYNTAX_ERR, f"Invalid char declaration", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                            if not reference_value_str.isdigit():
+                                raise SyntaxException(SYNTAX_ERR, f"Referenced value is not an integer: {reference_value_str}", f"{line_index}| {line}", highlight_errored_word(line, line_index, reference_value_str, -1))
+                            
+                            reference_value_int = int(reference_value_str)
 
-                        spaces[ReservedSpace.Consts].set_subtokens([Token(
-                            Action.Defining,
-                            const_owner,
-                            Keyword.VarSet,
-                            [
-                                (const_type, const_value)
-                            ],
-                            line_index,
-                            line
-                        )])
+                            if len(reference_value_str) != len(str(reference_value_int)):
+                                raise SyntaxException(SYNTAX_ERR, f"Unnecessary characters during referencing", f"{line_index}| {line}", highlight_errored_word(line, line_index, reference_value_str, -1))
+
+                            spaces[ReservedSpace.Consts].add_subtokens([Token(
+                                Action.Defining,
+                                const_owner,
+                                Keyword.VarSet,
+                                [
+                                    (Keyword.Refer, reference_value_int)
+                                ],
+                                line_index,
+                                line
+                            )])
+                        
+                        else:
+                            const_value: str = ""
+
+                            if const_type in (Type.Int, Type.Char, Type.Bool):
+                                const_value = args[3]
+
+                                if len(args) > 4: 
+                                    raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[4], -1))
+                                
+                                match const_type:
+                                    case Type.Int:
+                                        if not args[3].isdigit():
+                                            raise SyntaxException(SYNTAX_ERR, "Incorrect value set for int", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                    case Type.Bool:
+                                        if args[3] not in ('True', 'False', 'Null', 'Vague'):
+                                            raise SyntaxException(SYNTAX_ERR, "Unknown bool value", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                    case Type.Char:
+                                        if args[3][0] != "\'" or args[3][-1] != "\'":
+                                            raise SyntaxException(SYNTAX_ERR, "Invalid char declaration", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+
+                            # int array
+                            elif const_type == Type.IntArray:
+                                arr_value_list: list[str] = args[3:]
+                                arr_value_str: str = "".join(arr_value_list).strip()
+                                
+                                if arr_value_str[0] != '{' or arr_value_str[-1] != '}':
+                                    raise SyntaxException(SYNTAX_ERR, f"Invalid array declaration at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, arr_value_str, -1))
+                                
+                                arr_values: list[str] = arr_value_str[1:-1].split(',')
+
+                                for val in arr_values:
+                                    if not val.isdigit():
+                                        raise SyntaxException(SYNTAX_ERR, f"Invalid declaration for int array: {val}", f"{line_index}| {line}", highlight_errored_word(line, line_index, val, -1))
+                                    
+                                const_value = arr_value_str
+
+                            # strings
+                            else:
+                                string_list: list[str] = args[3:]
+                                string_str: str = " ".join(string_list).strip()
+
+                                if string_str[0] != '"' or string_str[-1] != '"':
+                                    raise SyntaxException(SYNTAX_ERR, f"Invalid string declaration at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, string_str, -1))
+                                
+                                string_value: str = string_str[1:-1]
+
+                                const_value = string_value
+                            
+                            spaces[ReservedSpace.Consts].add_subtokens([Token(
+                                Action.Defining,
+                                const_owner,
+                                Keyword.VarSet,
+                                [
+                                    (const_type, const_value)
+                                ],
+                                line_index,
+                                line
+                            )])
 
                     elif cur_space == ReservedSpace.Pre:
-                        pass
+                        if len(args) < 4: 
+                            raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to pre-define a variable, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+
+                        var_ref_str: str = args[0]
+                        if not var_ref_str.isdigit():
+                            raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _pre at reference", f"{line_index}| {line}", highlight_errored_word(line, line_index, var_ref_str, 0))
+                        
+                        var_owner: str | Literal[ReservedSpace.Main] = args[1]
+                        if var_owner[0] != '[' or var_owner[-1] != ']':
+                            raise SyntaxException(SYNTAX_ERR, f"Expected owner of variable", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+                        else:
+                            var_owner = var_owner[1:-1]
+                        # reset to ReservedSpace.Main in case the string given is _main
+                        if var_owner == "_main": 
+                            var_owner = ReservedSpace.Main
+                        
+                        var_type_str: str = args[2]
+                        var_type: Type | None = None
+                        try:
+                            var_type = get_type_from_str(var_type_str)
+                        except RulesBreak as exc:
+                            raise RulesBreak(RULES_BREAK, exc.args[1], f"{line_index}| {line}", highlight_errored_word(line, line_index, var_type_str, 0)) from exc
+
+                        # if the value was referenced with ~
+                        # then specific path to add will be executed
+                        # so i mean the following
+                        if args[3].startswith('~'):
+                            reference_value_str: str = args[3][1:]
+                            reference_value_int: int = 0
+
+                            if len(args) > 4: 
+                                raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[4], -1))
+                            
+                            if not reference_value_str.isdigit():
+                                raise SyntaxException(SYNTAX_ERR, f"Referenced value is not an integer: {reference_value_str}", f"{line_index}| {line}", highlight_errored_word(line, line_index, reference_value_str, -1))
+                            
+                            reference_value_int = int(reference_value_str)
+
+                            if len(reference_value_str) != len(str(reference_value_int)):
+                                raise SyntaxException(SYNTAX_ERR, f"Unnecessary characters during referencing", f"{line_index}| {line}", highlight_errored_word(line, line_index, reference_value_str, -1))
+
+                            spaces[ReservedSpace.Pre].add_subtokens([Token(
+                                Action.Defining,
+                                var_owner,
+                                Keyword.VarSet,
+                                [
+                                    (Keyword.Refer, reference_value_int)
+                                ],
+                                line_index,
+                                line
+                            )])
+                            
+                        else:
+                            var_value: str = ""
+                            if var_type in (Type.Int, Type.Char, Type.Bool):
+                                var_value = args[3]
+
+                                if len(args) > 4: 
+                                    raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[4], -1))
+                                
+                                match var_type:
+                                    case Type.Int:
+                                        if not args[3].isdigit():
+                                            raise SyntaxException(SYNTAX_ERR, f"Incorrect value set for int", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                    case Type.Bool:
+                                        if args[3] not in ('True', 'False', 'Null', 'Vague'):
+                                            raise SyntaxException(SYNTAX_ERR, f"Unknown bool value", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+                                    case Type.Char:
+                                        if args[3][0] != "\'" or args[3][-1] != "\'":
+                                            raise SyntaxException(SYNTAX_ERR, f"Invalid char declaration", f"{line_index}| {line}", highlight_errored_word(line, line_index, args[3], -1))
+
+                            # int array
+                            elif var_type == Type.IntArray:
+                                arr_value_list: list[str] = args[3:]
+                                arr_value_str: str = "".join(arr_value_list).strip()
+                                
+                                if arr_value_str[0] != '{' or arr_value_str[-1] != '}':
+                                    raise SyntaxException(SYNTAX_ERR, f"Invalid array declaration at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, arr_value_str, -1))
+                                
+                                arr_values: list[str] = arr_value_str[1:-1].split(',')
+
+                                for val in arr_values:
+                                    if not val.isdigit():
+                                        raise SyntaxException(SYNTAX_ERR, f"Invalid declaration for int array: {val}", f"{line_index}| {line}", highlight_errored_word(line, line_index, val, -1))
+                                    
+                                var_value = arr_value_str
+
+                            # strings
+                            else:
+                                string_list: list[str] = args[3:]
+                                string_str: str = " ".join(string_list).strip()
+
+                                if string_str[0] != '"' or string_str[-1] != '"':
+                                    raise SyntaxException(SYNTAX_ERR, f"Invalid string declaration at {line_index}", f"{line_index}| {line}", highlight_errored_word(line, line_index, string_str, -1))
+                                
+                                string_value: str = string_str[1:-1]
+
+                                var_value = string_value
+
+                            spaces[ReservedSpace.Pre].add_subtokens([Token(
+                                Action.Defining,
+                                var_owner,
+                                Keyword.VarSet,
+                                [
+                                    (var_type, var_value)
+                                ],
+                                line_index,
+                                line
+                            )])
 
                     elif cur_space == ReservedSpace.Stdin:
                         pass
 
+                    # the rest of instructions
                     else:
                         pass
 

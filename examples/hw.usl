@@ -7,7 +7,9 @@ _links:
 
 _consts:
     1 [_print_hw] char[] "Hello, World!\n" 
-    4 [_main] char "\n"
+    4 [_main] char '\n'     
+    6 [_main] int[] {1, 2, 3}
+    7 [_main] char[] ~10
 
 _pre:
     2 [_main] int 0
