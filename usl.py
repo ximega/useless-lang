@@ -4,9 +4,11 @@
 import sys, pprint
 from termcolor import colored
 
-from rules import RulesBreak
-from tokenizer import Tokenizer, Token, Pointer
-from errors import *
+from src.rules import RulesBreak
+from src.errors import *
+from src.tokens.tokenizer import Tokenizer
+from src.tokens.tokenclass import Token
+from src.tokens.pointer import Pointer
 
 
 def main() -> None:
@@ -25,9 +27,7 @@ def main() -> None:
         try:
             tokenizer: Tokenizer = Tokenizer(Pointer(lines))
 
-            tokens: list[Token] = []
-
-            tokens = tokenizer.parse_to_tokens()
+            tokens: list[Token] = tokenizer.parse_to_tokens()
 
             pprint.pprint(tokens)
         except (
