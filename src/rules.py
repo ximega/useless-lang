@@ -1,14 +1,24 @@
 from enum import Enum, auto
 import string
 
-from errors import RulesBreak, RULES_BREAK
+from src.errors import RulesBreak, RULES_BREAK
+
+
+__all__ = [
+    'ALLOWED_CHARS', 'MAX_VAR', 'ALLOWED_LINK_CHARS', 'ALLOWED_RS_CHARS', 'ALLOWED_CUSTOM_SPACE_CHARS', 'LINK_CHAR_LEN', 
+    'GLOBAL_OWNER', 'ALL_RESERVED_SPACES_AS_STR', 'ALLOWED_INDENTATIONS', 'DEFAULT_INDENTATION', 'THREE_LETTER_KEYWORDS',
+    'ALLOWED_SUBTOKEN_INSTRUCTIONS', 
+    'Type', 'ReservedSpace', 'Keyword', 'Action',
+    'get_type_from_str', 'get_reserved_space_from_str', 'get_str_from_reserved_space', 'get_keyword_from_str',
+    'get_str_from_keyword',
+]
 
 
 ALLOWED_CHARS: str = string.ascii_letters + string.digits + f"$_,[]\\!?~<>-=%\n: \"\'()&{{}}"
 
 MAX_VAR = 65535
 
-ALLOWED_LINK_CHARS: str = string.ascii_lowercase
+ALLOWED_LINK_CHARS: str = string.ascii_lowercase + string.digits
 
 ALLOWED_RS_CHARS: str = string.ascii_letters + '_'
 ALLOWED_CUSTOM_SPACE_CHARS: str = ALLOWED_RS_CHARS + '$'
@@ -116,9 +126,10 @@ class Keyword(Enum):
     Call = auto() # call
     Goto = auto() # goto
     IfStatement = auto() # if
+    Describe = auto() # desc
 
-ALLOWED_SUBTOKEN_INSTRUCTION: list[Keyword] = [
-    Keyword.IfStatement
+ALLOWED_SUBTOKEN_INSTRUCTIONS: list[Keyword] = [
+    Keyword.IfStatement,
 ]
 
 def get_keyword_from_str(kw: str) -> Keyword:
@@ -128,7 +139,8 @@ def get_keyword_from_str(kw: str) -> Keyword:
         'dec': Keyword.Decrease,
         'call': Keyword.Call,
         'goto': Keyword.Goto,
-        'if': Keyword.IfStatement
+        'if': Keyword.IfStatement,
+        'desc': Keyword.Describe,
     }
     try:
         return pairs[kw]
@@ -142,6 +154,7 @@ def get_str_from_keyword(kw: Keyword) -> str:
         Keyword.Decrease: 'dec', 
         Keyword.Call: 'call', 
         Keyword.Goto: 'goto', 
-        Keyword.IfStatement: 'if'
+        Keyword.IfStatement: 'if',
+        Keyword.Describe: 'desc',
     }
     return pairs[kw]
