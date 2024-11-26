@@ -22,6 +22,7 @@ $_print_hw [_main]:
     stdout ~1
 
 _main % (&3):
+    desc "Times: " ->3
     <mdi> if 3 (~2 < ~3) ->5
     inc ~2 1
     stdout ~5
