@@ -105,7 +105,7 @@ def get_link_names_inside_linkRS(pointer: Pointer, indentation: int) -> list[str
     return links
 
 def make_link_subtokens(links: list[str], line: str, line_index: int)-> list[Token]:
-    """Makes tokens with all links given through `links`"""
+    """Makes tokens with all links given through _links"""
     return [
         Token(
             Action.Defining,
@@ -123,6 +123,12 @@ def make_link_subtokens(links: list[str], line: str, line_index: int)-> list[Tok
 def find_cs_owner(
         chars: list[str], args: list[str], line: str, line_index: int, space_name: str
     ) -> str | Literal[ReservedSpace.Main]:
+    """Tries to find owner of the custom space (which are defined by initial $ symbol)
+    
+    Raises:
+        `SYNTAX_ERR`
+        * No owner found
+    """
 
     # removing from args[1] (which is supposed to be just owner)
     try:
@@ -139,6 +145,15 @@ def find_cs_owner(
     return args[1] if args[1] != "_main" else ReservedSpace.Main
 
 def find_var_value_simpletypes(args: list[str], line: str, line_index: int, var_type: Literal[Type.Int, Type.Bool, Type.Char]) -> str:
+    """Finds a value of variable inside _consts or _pre for bool, int, char
+
+    Raises 
+        `SYNTAX_ERR`
+        * Not int/bool/char value (if corresponding type was set)
+        * More than 4 arguments
+        * Invalid char declaration (must be with singular apostrophe, from both sides)
+    """
+    
     if len(args) > 4: 
         raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", *put_errored_code_line(line, line_index, args[4], -1))
     
@@ -156,6 +171,14 @@ def find_var_value_simpletypes(args: list[str], line: str, line_index: int, var_
     return args[3]
 
 def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
+    """Finds a value of variable inside _consts or _pre for int[]
+
+    Raises
+        `SYNTAX_ERR`
+        * Not declared with braces "{}"
+        * A non-digit included inside braces
+    """
+
     arr_value_str: str = "".join(args[3:]).strip()
         
     if arr_value_str[0] != '{' or arr_value_str[-1] != '}':
@@ -170,6 +193,13 @@ def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
     return arr_value_str
 
 def find_var_value_string(args: list[str], line: str, line_index: int) -> str:
+    """Finds a value of variable inside _consts or _pre for char[] (which is string)
+
+    Raises
+        `SYNTAX_ERR`
+        * String not declared with double-apostrophe, from both sides
+    """
+
     string_str: str = " ".join(args[3:]).strip()
 
     if string_str[0] != '"' or string_str[-1] != '"':
@@ -189,4 +219,4 @@ def find_var_value(args: list[str], line: str, line_index: int, var_type: Type) 
         Type.String: find_var_value_string,
     }
 
-    return pairs.get(var_type, default_call)()
+    return pairs.get(var_type, default_call)() 

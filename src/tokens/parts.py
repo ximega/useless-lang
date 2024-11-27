@@ -36,6 +36,9 @@ def tokenize_reserved_spaces(
         chars: list[str], line: str, line_index: int, pointer: Pointer,            
         indentation: int, cur_space: str | ReservedSpace | None, spaces: dict[str | ReservedSpace, Token]
     ) -> tuple[int, CurSpace, SpacesDict]:
+    """Depending on the rs name tokenizes them.\n
+    Creates subtokens for _indent and _links straightaway, instead of later self.cur_space matching
+    """
 
     # the current space name is defined 
     space_name: str = get_rs_name(chars, line, line_index)
@@ -65,6 +68,8 @@ def tokenize_custom_spaces(
         chars: list[str], args: list[str], line: str, line_index: int,     
         cur_space: str | ReservedSpace | None, spaces: dict[str | ReservedSpace, Token]
     ) -> tuple[CurSpace, SpacesDict]:
+    """Spaces definition of which starts with $ are called custom
+    """
     
     space_name: str = get_cs_name(args, line, line_index)
 
@@ -104,6 +109,8 @@ def tokenize_subtokens_var(
         args: list[str], line: str, line_index: int, 
         spaces: dict[str | ReservedSpace, Token]
     ) -> SpacesDict:
+    """Tokenizes variables and sets them as subtokens to either _consts or _pre"""
+
     if len(args) < 4: 
         raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a constant, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
 

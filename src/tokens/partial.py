@@ -43,6 +43,10 @@ def tokenize_rs_indent(
         chars: list[str], line: str, line_index: int, 
         indentation: int, cur_space: CurSpace | None, spaces: SpacesDict
     ) -> tuple[int, CurSpace, SpacesDict]:
+    """Finds the value of indentation in _indent rs.\n
+    As it is the only rs
+    where writing after : is allowed and it cannot be followed with blocks under it\n
+    """
     
     if chars[len("_indent")] != ":":
         raise SyntaxException(SYNTAX_ERR, "Expected a colon after _indent", *put_errored_code_line(line, line_index, "t", 0))                     
@@ -85,6 +89,9 @@ def tokenize_rs_links(
         line: str, line_index: int, pointer: Pointer, indentation: int,
         cur_space: CurSpace | None, spaces: SpacesDict
     ) -> tuple[CurSpace, SpacesDict]:
+    """The only rs that is tokenized straightaway, 
+    instead of later tokenizing with matching self.cur_space
+    """
 
     links: list[str] = get_link_names_inside_linkRS(pointer, indentation)
 
@@ -136,6 +143,9 @@ def tokenize_referenced_var(
         args: list[str], line: str, line_index: int, var_owner: str | Literal[ReservedSpace.Main],
         spaces: SpacesDict, 
     ) -> SpacesDict:
+    """Tokenizes variables and puts them as subtokens to either _consts or _pre.\n
+    The referenced variables are those, whose value was copied from another value with ~ (reference keyword)
+    """
 
     reference_value_str: str = args[3][1:]
     reference_value_int: int = 0
@@ -169,6 +179,8 @@ def tokenize_literal_var(
         args: list[str], line: str, line_index: int, var_type: Type, var_owner: str | Literal[ReservedSpace.Main], 
         spaces: SpacesDict,
     ) -> SpacesDict:
+    """Literal values put by manually writing initial values inside _consts or _pre rs
+    """
 
     var_value: str = find_var_value(args, line, line_index, var_type)
     
