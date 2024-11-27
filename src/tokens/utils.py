@@ -1,15 +1,17 @@
 """Contains small functionalities for other /src/tokens/* modules
 """
 
-from typing import Literal
+from typing import Literal, NoReturn
+from collections.abc import Callable
 
 from src.errors import (
     SyntaxException, SYNTAX_ERR,
     DuplicationException, DUPLICATION_ERR,
+    TokenizerException, TOKENIZER_ERR,
 )
 from src.rules import (
     ALLOWED_RS_CHARS, THREE_LETTER_KEYWORDS, ALLOWED_LINK_CHARS,
-    Action, Keyword, ReservedSpace
+    Action, Keyword, ReservedSpace, Type
 )
 from src.tokens.pointer import Pointer
 from src.errorutils import put_errored_code_line
@@ -135,3 +137,56 @@ def find_cs_owner(
         raise SyntaxError(SYNTAX_ERR, f"Missing owner", *put_errored_code_line(line, line_index, chars[len(space_name)], -1))
     
     return args[1] if args[1] != "_main" else ReservedSpace.Main
+
+def find_var_value_simpletypes(args: list[str], line: str, line_index: int, var_type: Literal[Type.Int, Type.Bool, Type.Char]) -> str:
+    if len(args) > 4: 
+        raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", *put_errored_code_line(line, line_index, args[4], -1))
+    
+    match var_type:
+        case Type.Int:
+            if not args[3].isdigit():
+                raise SyntaxException(SYNTAX_ERR, "Incorrect value set for int", *put_errored_code_line(line, line_index, args[3], -1))
+        case Type.Bool:
+            if args[3] not in ('True', 'False', 'Null', 'Vague'):
+                raise SyntaxException(SYNTAX_ERR, "Unknown bool value", *put_errored_code_line(line, line_index, args[3], -1))
+        case Type.Char:
+            if args[3][0] != "\'" or args[3][-1] != "\'":
+                raise SyntaxException(SYNTAX_ERR, "Invalid char declaration", *put_errored_code_line(line, line_index, args[3], -1))
+            
+    return args[3]
+
+def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
+    arr_value_str: str = "".join(args[3:]).strip()
+        
+    if arr_value_str[0] != '{' or arr_value_str[-1] != '}':
+        raise SyntaxException(SYNTAX_ERR, f"Invalid array declaration at {line_index}", *put_errored_code_line(line, line_index, arr_value_str, -1))
+    
+    arr_values: list[str] = arr_value_str[1:-1].split(',')
+
+    for val in arr_values:
+        if not val.isdigit():
+            raise SyntaxException(SYNTAX_ERR, f"Invalid declaration for int array: {val}", *put_errored_code_line(line, line_index, val, -1))
+        
+    return arr_value_str
+
+def find_var_value_string(args: list[str], line: str, line_index: int) -> str:
+    string_str: str = " ".join(args[3:]).strip()
+
+    if string_str[0] != '"' or string_str[-1] != '"':
+        raise SyntaxException(SYNTAX_ERR, f"Invalid string declaration at {line_index}", *put_errored_code_line(line, line_index, string_str, -1))
+    
+    return string_str[1:-1]
+
+def find_var_value(args: list[str], line: str, line_index: int, var_type: Type) -> str:
+    def default_call() -> NoReturn:
+        raise TokenizerException(TOKENIZER_ERR, f"Unknown type at {line_index}", *put_errored_code_line(line, line_index, line, 0))
+
+    pairs: dict[Type, Callable[..., str]] = {
+        Type.Int: find_var_value_simpletypes,
+        Type.Bool: find_var_value_simpletypes,
+        Type.Char: find_var_value_simpletypes,
+        Type.IntArray: find_var_value_intarray,
+        Type.String: find_var_value_string,
+    }
+
+    return pairs.get(var_type, default_call)()

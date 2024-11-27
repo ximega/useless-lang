@@ -5,13 +5,15 @@
 from typing import Literal
 
 from src.rules import (
-    ReservedSpace, Keyword, Action,
-    ALL_RESERVED_SPACES_AS_STR, ALLOWED_CUSTOM_SPACE_CHARS
+    ReservedSpace, Keyword, Action, Type,
+    ALL_RESERVED_SPACES_AS_STR, ALLOWED_CUSTOM_SPACE_CHARS,
+    get_type_from_str,
 )
 from src.errors import (
     SyntaxException, SYNTAX_ERR,
     DuplicationException, DUPLICATION_ERR,
     OwnershipException, OWNERSHIP_ERR,
+    RulesBreak, RULES_BREAK,
 )
 from src.tokens.pointer import Pointer
 from src.errorutils import put_errored_code_line
@@ -26,6 +28,7 @@ from src.tokens.partial import *
 __all__ = [
     'tokenize_reserved_spaces',
     'tokenize_custom_spaces',
+    'tokenize_subtokens_var',
 ]
 
 
@@ -95,3 +98,42 @@ def tokenize_custom_spaces(
     )
 
     return (cur_space, spaces)
+
+def tokenize_subtokens_var(
+        space: Literal[ReservedSpace.Consts, ReservedSpace.Pre],
+        args: list[str], line: str, line_index: int, 
+        spaces: dict[str | ReservedSpace, Token]
+    ) -> SpacesDict:
+    if len(args) < 4: 
+        raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a constant, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+
+    var_ref_str: str = args[0]
+    if not var_ref_str.isdigit():
+        raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _const at reference", *put_errored_code_line(line, line_index, var_ref_str, 0))
+    
+    var_owner: str | Literal[ReservedSpace.Main] = args[1]
+    if var_owner[0] != '[' or var_owner[-1] != ']':
+        raise SyntaxException(SYNTAX_ERR, f"Expected owner of constant", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+    else:
+        var_owner = var_owner[1:-1]
+    # reset to ReservedSpace.Main in case the string given is _main
+    if var_owner == "_main": 
+        var_owner = ReservedSpace.Main
+    
+    var_type_str = args[2]
+    var_type: Type | None = None
+    try:
+        var_type = get_type_from_str(var_type_str)
+    except RulesBreak as exc:
+        raise RulesBreak(RULES_BREAK, exc.args[1], *put_errored_code_line(line, line_index, var_type_str, 0)) from exc
+
+    # if the value was referenced with ~
+    # then specific path to add will be executed
+    # so i mean the following
+    if args[3].startswith('~'):
+        spaces = tokenize_referenced_var(space, args, line, line_index, var_owner, spaces)
+    
+    else:
+        spaces = tokenize_literal_var(space, args, line, line_index, var_type, var_owner, spaces)
+
+    return spaces
