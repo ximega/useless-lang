@@ -22,6 +22,7 @@ from src.tokens.utils import (
     make_link_subtokens,
     find_var_value,
 )
+from src.tokens.checks import PartialChecks
 
 
 __all__ = [
@@ -48,20 +49,14 @@ def tokenize_rs_indent(
     where writing after : is allowed and it cannot be followed with blocks under it\n
     """
     
-    if chars[len("_indent")] != ":":
-        raise SyntaxException(SYNTAX_ERR, "Expected a colon after _indent", *put_errored_code_line(line, line_index, "t", 0))                     
-    
+    PartialChecks.indent_rs_no_colon(chars, line, line_index)
+
     indent_val: str = find_indent_value(chars)
-
-    if indent_val.strip() == "":
-        raise SyntaxException(SYNTAX_ERR, "No value given to _indent. Either remove the line or specify the value", *put_errored_code_line(line, line_index, line[-1], 0))
-
-    if not indent_val.isdigit():
-        raise SyntaxException(SYNTAX_ERR, "The value of _indent must be an integer", *put_errored_code_line(line, line_index, indent_val, -1))
+    PartialChecks.is_value_given(indent_val, line, line_index)
+    PartialChecks.indent_val_is_int(indent_val, line, line_index)
     
     indent: int = int(indent_val)
-    if indent not in ALLOWED_INDENTATIONS:
-        raise SyntaxException(SYNTAX_ERR, f"Indentation must be one of {", ".join([str(x) for x in ALLOWED_INDENTATIONS])}", *put_errored_code_line(line, line_index, indent_val, -1))
+    PartialChecks.is_allowed_indent(indent, line, line_index)
 
     # repetition cause pylint complains
     indentation = indent
@@ -150,16 +145,12 @@ def tokenize_referenced_var(
     reference_value_str: str = args[3][1:]
     reference_value_int: int = 0
 
-    if len(args) > 4: 
-        raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", *put_errored_code_line(line, line_index, args[4], -1))
-    
-    if not reference_value_str.isdigit():
-        raise SyntaxException(SYNTAX_ERR, f"Referenced value is not an integer: {reference_value_str}", *put_errored_code_line(line, line_index, reference_value_str, -1))
+    PartialChecks.four_args_in_var_defining(args, line, line_index)
+    PartialChecks.reference_is_digit(reference_value_str, line, line_index)
     
     reference_value_int = int(reference_value_str)
 
-    if len(reference_value_str) != len(str(reference_value_int)):
-        raise SyntaxException(SYNTAX_ERR, f"Unnecessary characters during referencing", *put_errored_code_line(line, line_index, reference_value_str, -1))
+    PartialChecks.forbidden_chars_in_reference(reference_value_str, reference_value_int, line, line_index)
 
     spaces[space].add_subtokens([Token(
         Action.Defining,
