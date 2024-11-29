@@ -5,17 +5,16 @@ from typing import Literal, NoReturn
 from collections.abc import Callable
 
 from src.errors import (
-    SyntaxException, SYNTAX_ERR,
-    DuplicationException, DUPLICATION_ERR,
     TokenizerException, TOKENIZER_ERR,
+    SyntaxException, SYNTAX_ERR,
 )
 from src.rules import (
-    ALLOWED_RS_CHARS, THREE_LETTER_KEYWORDS, ALLOWED_LINK_CHARS,
     Action, Keyword, ReservedSpace, Type
 )
 from src.tokens.pointer import Pointer
 from src.errorutils import put_errored_code_line
 from src.tokens.tokenclass import Token
+from src.tokens.checks import UtilsChecks
 
 
 __all__ = [
@@ -37,19 +36,14 @@ def get_rs_name(chars: list[str], line: str, line_index: int) -> str:
     space_name = str()
     for char in chars:
         if char in (":", "%"): break
-        if char not in ALLOWED_RS_CHARS:
-            raise SyntaxException(SYNTAX_ERR, f"Invalid space name syntax: {space_name}", *put_errored_code_line(line, line_index, space_name, 0))
+        UtilsChecks.allowed_rs_chars(space_name, char, line, line_index)
         space_name += char
     return space_name
 
-def get_cs_name(args: list[str], line: str, line_index: int) -> str:
+def get_cs_name(args: list[str]) -> str:
     """Finds the name of custom space, 
     as it starts with $, the first symbol is removed until it encounters '[',
     which signals that it is time for mentioning owner of the function
-
-    Raises
-        `SYNTAX_ERR`
-        * Not allowed char (see `rules.ALLOWED_CUSTOM_SPACE_CHARS`)
     """
     return args[0][1:]
 
@@ -83,20 +77,11 @@ def get_link_names_inside_linkRS(pointer: Pointer, indentation: int) -> list[str
 
         for arg in line_args:
 
-            if arg[0].isdigit():
-                raise SyntaxException(SYNTAX_ERR, f"First char cannot be a digit: {arg[0]}", *put_errored_code_line(next_line, next_line_index, arg[0], 0))
-
-            if arg in THREE_LETTER_KEYWORDS:
-                raise SyntaxException(SYNTAX_ERR, f"Cannot override a keyword: {arg}", *put_errored_code_line(next_line, next_line_index, arg, 0))
-
-            if len(arg) != 3:
-                raise SyntaxException(SYNTAX_ERR, f"The length of {arg} must be strongly 3 chars", *put_errored_code_line(next_line, next_line_index, arg, 0))
-            for char in list(arg):
-                if char not in ALLOWED_LINK_CHARS:
-                    raise SyntaxException(SYNTAX_ERR, f"The link can not include {char} char", *put_errored_code_line(next_line, next_line_index, char, 0))
-        
-            if arg in links:
-                raise DuplicationException(DUPLICATION_ERR, f"Can not two identical links: {arg}", *put_errored_code_line(next_line, next_line_index, arg, 0))
+            UtilsChecks.LinkName.first_not_digit(arg, next_line, next_line_index)
+            UtilsChecks.LinkName.not_override_kw(arg, next_line, next_line_index)
+            UtilsChecks.LinkName.is_3_char_long(arg, next_line, next_line_index)
+            UtilsChecks.LinkName.for_allowed_chars(arg, next_line, next_line_index)
+            UtilsChecks.LinkName.not_a_duplicate(arg, links, next_line, next_line_index)
 
         links.extend(line_args)
         index += 1
@@ -132,15 +117,12 @@ def find_cs_owner(
 
     # removing from args[1] (which is supposed to be just owner)
     try:
-        if chars[len(space_name)] == ":":
-            raise SyntaxException(SYNTAX_ERR, f"Missing owner", *put_errored_code_line(line, line_index, chars[len(space_name)], -1))
-
-        if args[1][0] != "[" or args[1][-1] != "]":
-            raise SyntaxException(SYNTAX_ERR, f"Custom space initialization must follow with an owner: {space_name}", *put_errored_code_line(line, line_index, space_name[-1], -1))
+        UtilsChecks.FindCsOwner.owner_not_after_colon(chars, space_name, line, line_index)
+        UtilsChecks.FindCsOwner.follows_with_owner(args, space_name, line, line_index)        
         
         args[1] = args[1][1:-1]
     except IndexError:
-        raise SyntaxError(SYNTAX_ERR, f"Missing owner", *put_errored_code_line(line, line_index, chars[len(space_name)], -1))
+        raise SyntaxException(SYNTAX_ERR, f"Missing owner", *put_errored_code_line(line, line_index, chars[len(space_name)], -1))
     
     return args[1] if args[1] != "_main" else ReservedSpace.Main
 
@@ -154,19 +136,15 @@ def find_var_value_simpletypes(args: list[str], line: str, line_index: int, var_
         * Invalid char declaration (must be with singular apostrophe, from both sides)
     """
     
-    if len(args) > 4: 
-        raise TokenizerException(TOKENIZER_ERR, f"Unexpected token at {line_index}", *put_errored_code_line(line, line_index, args[4], -1))
+    UtilsChecks.VarValue.Simpletypes.four_args_in_var_defining(args, line, line_index)
     
     match var_type:
         case Type.Int:
-            if not args[3].isdigit():
-                raise SyntaxException(SYNTAX_ERR, "Incorrect value set for int", *put_errored_code_line(line, line_index, args[3], -1))
+            UtilsChecks.VarValue.Simpletypes.for_int_is_integer(args[3], line, line_index)
         case Type.Bool:
-            if args[3] not in ('True', 'False', 'Null', 'Vague'):
-                raise SyntaxException(SYNTAX_ERR, "Unknown bool value", *put_errored_code_line(line, line_index, args[3], -1))
+            UtilsChecks.VarValue.Simpletypes.for_bool_is_bool(args[3], line, line_index)
         case Type.Char:
-            if args[3][0] != "\'" or args[3][-1] != "\'":
-                raise SyntaxException(SYNTAX_ERR, "Invalid char declaration", *put_errored_code_line(line, line_index, args[3], -1))
+            UtilsChecks.VarValue.Simpletypes.for_char_is_char(args[3], line, line_index)
             
     return args[3]
 
@@ -178,18 +156,10 @@ def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
         * Not declared with braces "{}"
         * A non-digit included inside braces
     """
-
     arr_value_str: str = "".join(args[3:]).strip()
-        
-    if arr_value_str[0] != '{' or arr_value_str[-1] != '}':
-        raise SyntaxException(SYNTAX_ERR, f"Invalid array declaration at {line_index}", *put_errored_code_line(line, line_index, arr_value_str, -1))
-    
+    UtilsChecks.VarValue.Intarray.is_valid_declaration(arr_value_str, line, line_index)
     arr_values: list[str] = arr_value_str[1:-1].split(',')
-
-    for val in arr_values:
-        if not val.isdigit():
-            raise SyntaxException(SYNTAX_ERR, f"Invalid declaration for int array: {val}", *put_errored_code_line(line, line_index, val, -1))
-        
+    UtilsChecks.VarValue.Intarray.all_values_int(arr_values, line, line_index)
     return arr_value_str
 
 def find_var_value_string(args: list[str], line: str, line_index: int) -> str:
@@ -199,16 +169,12 @@ def find_var_value_string(args: list[str], line: str, line_index: int) -> str:
         `SYNTAX_ERR`
         * String not declared with double-apostrophe, from both sides
     """
-
     string_str: str = " ".join(args[3:]).strip()
-
-    if string_str[0] != '"' or string_str[-1] != '"':
-        raise SyntaxException(SYNTAX_ERR, f"Invalid string declaration at {line_index}", *put_errored_code_line(line, line_index, string_str, -1))
-    
+    UtilsChecks.VarValue.is_valid_string_declaration(string_str, line, line_index)
     return string_str[1:-1]
 
 def find_var_value(args: list[str], line: str, line_index: int, var_type: Type) -> str:
-    def default_call() -> NoReturn:
+    def default_call(*args: ...) -> NoReturn:
         raise TokenizerException(TOKENIZER_ERR, f"Unknown type at {line_index}", *put_errored_code_line(line, line_index, line, 0))
 
     pairs: dict[Type, Callable[..., str]] = {
@@ -219,4 +185,4 @@ def find_var_value(args: list[str], line: str, line_index: int, var_type: Type) 
         Type.String: find_var_value_string,
     }
 
-    return pairs.get(var_type, default_call)() 
+    return pairs.get(var_type, default_call)(args, line, line_index, var_type) 

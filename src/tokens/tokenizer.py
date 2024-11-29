@@ -11,6 +11,7 @@ from src.tokens.pointer import Pointer
 from src.tokens.utils import *
 from src.tokens.tokenclass import Token
 from src.tokens.parts import *
+from src.tokens.checks import TokenizerChecks
         
 
 __all__ = [
@@ -48,8 +49,7 @@ class Tokenizer:
                 # cannot start with any type of indentation
                 # + line with zero-indent 
                 # cannot be anything else than space defining
-                if self.line.startswith(" ") and (self.line.lstrip() in ("$", "_")):
-                    raise SyntaxException(SYNTAX_ERR, f"Invalid indentation at {self.line_index}", *put_errored_code_line(self.line, self.line_index, " ", 0))
+                TokenizerChecks.is_valid_space_indentation(self.line, self.line_index)
 
                 # reserved spaces
                 # all of them are specified in src/rules.py
@@ -63,8 +63,10 @@ class Tokenizer:
 
                 # handling definitions and instructions
                 elif self.line.startswith(' '*self.indentation):
-                    if self.line[self.indentation] == ' ': 
-                        raise SyntaxException(SYNTAX_ERR, f"Invalid indentation, expected {self.indentation}", *put_errored_code_line(self.line, self.line_index, ' ', self.indentation))
+                    # it may correctly recognize first 2/4 symbols as correct 
+                    # but if 5th or later symbols is space again, 
+                    # it would mean that indentation is longer than allowed
+                    TokenizerChecks.is_valid_instruction_indentation(self.indentation, self.line, self.line_index)
 
                     # handling _consts rs
                     match self.cur_space:
@@ -75,19 +77,20 @@ class Tokenizer:
                         case ReservedSpace.Stdin:
                             # TODO: to implement
                             pass
-                        case ReservedSpace.Links:
+                        case ReservedSpace.Links | ReservedSpace.Indent:
                             pass # it is already handled above with src.tokens.partial.tokenize_reserved_spaces()
                         case ReservedSpace.Main:
-                            pass
+                            # TODO: to implement
+                            pass 
                         case _:
                             # custom spaces
+                            # TODO: to implement
                             pass
 
                 else:
-                    if self.line[0] == " ": 
-                        raise SyntaxException(SYNTAX_ERR, f"Invalid indentation. Expected {self.indentation} indent", *put_errored_code_line(self.line, self.line_index, ' ', 0))
+                    TokenizerChecks.invalid_indentations(self.indentation, self.line, self.line_index)
 
-                    raise SyntaxException(SYNTAX_ERR, f"Unknown token at {self.line_index}", f"{self.line_index}| {self.line}", f"{"^"*(len(self.line) + len(str(self.line_index)) + 2)}")
+                    raise SyntaxException(SYNTAX_ERR, f"Unknown token at {self.line_index}", *put_errored_code_line(self.line, self.line_index, self.line, 0))
 
                 self.pointer.move()
                 self.line, self.line_index = self.pointer.current()

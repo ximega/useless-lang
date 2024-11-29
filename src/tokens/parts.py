@@ -6,13 +6,9 @@ from typing import Literal
 
 from src.rules import (
     ReservedSpace, Keyword, Action, Type,
-    ALL_RESERVED_SPACES_AS_STR, ALLOWED_CUSTOM_SPACE_CHARS,
     get_type_from_str,
 )
 from src.errors import (
-    SyntaxException, SYNTAX_ERR,
-    DuplicationException, DUPLICATION_ERR,
-    OwnershipException, OWNERSHIP_ERR,
     RulesBreak, RULES_BREAK,
 )
 from src.tokens.pointer import Pointer
@@ -23,6 +19,7 @@ from src.tokens.utils import (
     find_cs_owner,
 )
 from src.tokens.partial import *
+from src.tokens.checks import PartsChecks
 
 
 __all__ = [
@@ -44,13 +41,11 @@ def tokenize_reserved_spaces(
     space_name: str = get_rs_name(chars, line, line_index)
 
     # if rs does not exist
-    if space_name not in ALL_RESERVED_SPACES_AS_STR:
-        raise SyntaxException(SYNTAX_ERR, f"Not a reserved space: {space_name}", *put_errored_code_line(line, line_index, space_name, 0))
+    PartsChecks.RsSpace.is_rs(space_name, line, line_index)
     # if the line has anything after : in a reserved space
     # causes an exception
     # _indent does not cause anything, as the value is given straight after :
-    if chars[-1] != ":" and line[0:len("_indent")] != "_indent":
-        raise SyntaxException(SYNTAX_ERR, f"Space {space_name} must end with a colon", *put_errored_code_line(line, line_index, chars[-1], -1))
+    PartsChecks.RsSpace.ends_with_colon(space_name, chars, line, line_index)
 
     # if it is _indent rs
     if space_name == "_indent":
@@ -71,23 +66,15 @@ def tokenize_custom_spaces(
     """Spaces definition of which starts with $ are called custom
     """
     
-    space_name: str = get_cs_name(args, line, line_index)
+    space_name: str = get_cs_name(args)
 
-    if space_name in spaces.keys():
-        raise DuplicationException(DUPLICATION_ERR, f"Can not have two similar spaces: {space_name}", *put_errored_code_line(line, line_index, space_name, 0))
+    PartsChecks.CustomSpace.not_a_duplicate(space_name, spaces.keys(), line, line_index)
 
     owner_name: str | Literal[ReservedSpace.Main] = find_cs_owner(chars, args, line, line_index, space_name)
 
-    if owner_name == "": 
-        raise OwnershipException(OWNERSHIP_ERR, f"Can not set a null space as owner", *put_errored_code_line(line, line_index, '[]', -1))
-
-    if chars[-1] != ":":
-        raise SyntaxException(SYNTAX_ERR, "Expected a colon", *put_errored_code_line(line, line_index, chars[-1], -1))
-
-    if owner_name != ReservedSpace.Main:
-        for char in owner_name:
-            if char not in ALLOWED_CUSTOM_SPACE_CHARS:
-                raise SyntaxException(SYNTAX_ERR, f"Invalid char at {line_index} for owner", *put_errored_code_line(line, line_index, char, 0))
+    PartsChecks.CustomSpace.not_a_null_owner(owner_name, line, line_index)
+    PartsChecks.CustomSpace.ends_with_colon(chars, line, line_index)
+    PartsChecks.CustomSpace.for_allowed_chars(owner_name, line, line_index)
 
     cur_space = space_name
 
@@ -111,23 +98,20 @@ def tokenize_subtokens_var(
     ) -> SpacesDict:
     """Tokenizes variables and sets them as subtokens to either _consts or _pre"""
 
-    if len(args) < 4: 
-        raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a constant, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+    PartsChecks.VarSubtokens.disallowed_args(args, line, line_index)
 
     var_ref_str: str = args[0]
-    if not var_ref_str.isdigit():
-        raise SyntaxException(SYNTAX_ERR, f"Expected integer inside _const at reference", *put_errored_code_line(line, line_index, var_ref_str, 0))
+    PartsChecks.VarSubtokens.is_int(var_ref_str, line, line_index)
     
     var_owner: str | Literal[ReservedSpace.Main] = args[1]
-    if var_owner[0] != '[' or var_owner[-1] != ']':
-        raise SyntaxException(SYNTAX_ERR, f"Expected owner of constant", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
-    else:
-        var_owner = var_owner[1:-1]
-    # reset to ReservedSpace.Main in case the string given is _main
+    PartsChecks.VarSubtokens.not_a_null_owner(var_owner, space, line, line_index)
+
+    var_owner = var_owner[1:-1]
+    # set to ReservedSpace.Main in case the string given is _main
     if var_owner == "_main": 
         var_owner = ReservedSpace.Main
     
-    var_type_str = args[2]
+    var_type_str: str = args[2]
     var_type: Type | None = None
     try:
         var_type = get_type_from_str(var_type_str)
