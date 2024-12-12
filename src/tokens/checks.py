@@ -64,7 +64,8 @@ class UtilsChecks:
             
         @staticmethod
         def follows_with_owner(args: list[str], space_name: str, line: str, line_index: int) -> None:
-            if args[1][0] != "[" or args[1][-1] != "]":
+            if args[1][0] != "[" or args[1][-2:] != "]:":
+                print(args)
                 raise SyntaxException(SYNTAX_ERR, f"Custom space initialization must follow with an owner: {space_name}", *put_errored_code_line(line, line_index, space_name[-1], -1))
 
     class VarValue:
@@ -86,7 +87,7 @@ class UtilsChecks:
             
             @staticmethod
             def for_char_is_char(arg: str, line: str, line_index: int) -> None:
-                if (arg[0] != "\'" or arg[-1] != "\'") or (len(arg) != 3):
+                if (arg[0] != "\'" or arg[-1] != "\'") or (arg[1] != '\\' and len(arg) != 3) or (arg[1] == '\\' and len(arg) != 4):
                     raise SyntaxException(SYNTAX_ERR, "Invalid char declaration", *put_errored_code_line(line, line_index, arg, -1))
         
         class Intarray:
@@ -174,7 +175,7 @@ class PartsChecks:
         @staticmethod
         def for_allowed_chars(owner_name: str | Literal[ReservedSpace.Main], line: str, line_index: int) -> None:
             if owner_name != ReservedSpace.Main:
-                for char in owner_name:
+                for char in owner_name[1:-2]:
                     if char not in ALLOWED_CUSTOM_SPACE_CHARS:
                         raise SyntaxException(SYNTAX_ERR, f"Invalid char at {line_index} for owner", *put_errored_code_line(line, line_index, char, 0))
                     
@@ -182,7 +183,7 @@ class PartsChecks:
         @staticmethod
         def disallowed_args(args: list[str], line: str, line_index: int) -> None:
             if len(args) < 4: 
-                raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a constant, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+                raise SyntaxException(SYNTAX_ERR, f"Expected 4 arguments to define a variable, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
             
         @staticmethod
         def is_int(var_ref_str: str, line: str, line_index: int) -> None:
@@ -194,6 +195,22 @@ class PartsChecks:
             if var_owner[0] != '[' or var_owner[-1] != ']':
                 raise SyntaxException(SYNTAX_ERR, f"Expected owner of {"variable" if space == ReservedSpace.Pre else "const"}", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
             
+    class StdinSubtokens:
+        @staticmethod
+        def disallowed_args(args: list[str], line: str, line_index: int) -> None:
+            if len(args) != 3:
+                raise SyntaxException(SYNTAX_ERR, f"Expected 3 arguments to define a variable, {len(args)} were given", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+            
+        @staticmethod
+        def is_int(var_ref_str: str, line: str, line_index: int) -> None:
+            if not var_ref_str.isdigit():
+                raise SyntaxException(SYNTAX_ERR, f"Expected integer at reference", *put_errored_code_line(line, line_index, var_ref_str, 0))
+
+        @staticmethod
+        def not_a_null_owner(var_owner: str, line: str, line_index: int) -> None:
+            if var_owner[0] != '[' or var_owner[-1] != ']':
+                raise SyntaxException(SYNTAX_ERR, f"Expected owner of std input var", f"{line_index}| {line}", "^"*(len(line) + len(str(line_index)) + 2))
+
 class TokenizerChecks:
     @staticmethod
     def is_valid_space_indentation(line: str, line_index: int) -> None:

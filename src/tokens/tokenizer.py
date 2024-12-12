@@ -75,8 +75,7 @@ class Tokenizer:
                         case ReservedSpace.Pre:
                             self.spaces = tokenize_subtokens_var(self.cur_space, self.args, self.line, self.line_index, self.spaces)
                         case ReservedSpace.Stdin:
-                            # TODO: to implement
-                            pass
+                            self.spaces = tokenize_subtokens_stdin(self.args, self.line, self.line_index, self.spaces)
                         case ReservedSpace.Links | ReservedSpace.Indent:
                             pass # it is already handled above with src.tokens.partial.tokenize_reserved_spaces()
                         case ReservedSpace.Main:

@@ -148,7 +148,7 @@ def find_var_value_simpletypes(args: list[str], line: str, line_index: int, var_
             
     return args[3]
 
-def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
+def find_var_value_intarray(args: list[str], line: str, line_index: int, *argc: ...) -> str:
     """Finds a value of variable inside _consts or _pre for int[]
 
     Raises
@@ -162,7 +162,7 @@ def find_var_value_intarray(args: list[str], line: str, line_index: int) -> str:
     UtilsChecks.VarValue.Intarray.all_values_int(arr_values, line, line_index)
     return arr_value_str
 
-def find_var_value_string(args: list[str], line: str, line_index: int) -> str:
+def find_var_value_string(args: list[str], line: str, line_index: int, *argc: ...) -> str:
     """Finds a value of variable inside _consts or _pre for char[] (which is string)
 
     Raises

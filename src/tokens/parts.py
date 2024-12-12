@@ -26,6 +26,7 @@ __all__ = [
     'tokenize_reserved_spaces',
     'tokenize_custom_spaces',
     'tokenize_subtokens_var',
+    'tokenize_subtokens_stdin',
 ]
 
 
@@ -122,9 +123,42 @@ def tokenize_subtokens_var(
     # then specific path to add will be executed
     # so i mean the following
     if args[3].startswith('~'):
-        spaces = tokenize_referenced_var(space, args, line, line_index, var_owner, spaces)
-    
+        spaces = tokenize_referenced_var(space, args, line, line_index, int(var_ref_str), var_type, var_owner, spaces)
     else:
-        spaces = tokenize_literal_var(space, args, line, line_index, var_type, var_owner, spaces)
+        spaces = tokenize_literal_var(space, args, line, line_index, int(var_ref_str), var_type, var_owner, spaces)
+
+    return spaces
+
+def tokenize_subtokens_stdin(
+        args: list[str], line: str, line_index: int, 
+        spaces: dict[str | ReservedSpace, Token]
+    ) -> SpacesDict:
+    """Tokenizes subtokens of _stdin"""
+
+    PartsChecks.StdinSubtokens.disallowed_args(args, line, line_index)
+
+    var_ref_str: str = args[0]
+    PartsChecks.StdinSubtokens.is_int(var_ref_str, line, line_index)
+
+    var_owner: str | Literal[ReservedSpace.Main] = args[1]
+    PartsChecks.StdinSubtokens.not_a_null_owner(var_owner, line, line_index)
+
+    var_type_str: str = args[2]
+    var_type: Type | None = None
+    try:
+        var_type = get_type_from_str(var_type_str)
+    except RulesBreak as exc:
+        raise RulesBreak(RULES_BREAK, exc.args[1], *put_errored_code_line(line, line_index, var_type_str, 0)) from exc 
+
+    spaces[ReservedSpace.Stdin].add_subtokens([Token(
+        Action.Defining,
+        var_owner,
+        Keyword.VarSet,
+        [
+            (int(var_ref_str), var_type)
+        ],
+        line_index,
+        line
+    )]) 
 
     return spaces

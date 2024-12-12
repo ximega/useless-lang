@@ -1,7 +1,7 @@
 """Simply contains Token class
 """
 
-from typing import Self
+from typing import Self, Literal
 
 from src.errors import TOKENIZER_ERR, TokenizerException
 from src.rules import Action, Keyword, ReservedSpace, Type, ALLOWED_SUBTOKEN_INSTRUCTIONS, get_str_from_keyword
@@ -13,8 +13,20 @@ __all__ = [
 ]
 
 
+type ReferenceValue = int
+type VarValue = str
+type OtherArg = str
+
+type StdinArg = tuple[ReferenceValue, Type]
+type VarArg = tuple[ReferenceValue, Type, VarValue]
+type ReferencedValue = tuple[Literal[Keyword.Refer], ReferenceValue]
+type ReferencedValueArg = tuple[ReferenceValue, Type, ReferencedValue]
+
+type TokenArguments = list[StdinArg | VarArg | OtherArg | Keyword | ReservedSpace | ReferencedValueArg]
+
+
 class Token:
-    def __init__(self, action: Action, owner: str | ReservedSpace, keyword: Keyword, arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str | tuple[Keyword, int]], line_index: int, line: str) -> None:
+    def __init__(self, action: Action, owner: str | ReservedSpace, keyword: Keyword, arguments: TokenArguments, line_index: int, line: str) -> None:
         self.line_index: int = line_index
         self.line: str = line
             
@@ -22,7 +34,7 @@ class Token:
         self.owner: str | ReservedSpace = owner
         self.keyword: Keyword = keyword
         self.link: str | None = None
-        self.arguments: list[tuple[Type, str] | Keyword | ReservedSpace | str | tuple[Keyword, int]] = arguments
+        self.arguments: TokenArguments = arguments
         self.subtokens: list[Self] = []
 
         # for self.arguments:

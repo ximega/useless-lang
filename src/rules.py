@@ -110,7 +110,7 @@ class Keyword(Enum):
     CustomSpaceDef = auto() # $_
     StdinArgumentInit = auto() # %
     StdinArgumentOpen = auto() # (
-    StdioArgumentClose = auto() # )
+    StdinArgumentClose = auto() # )
     LinkOpen = auto() # <
     LinkClose = auto() # >
     LinkDef = auto() # actually an empty symbol. Just for tokenizer to understand

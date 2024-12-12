@@ -130,7 +130,7 @@ def tokenize_rs_other(
 
 def tokenize_referenced_var(
         space: Literal[ReservedSpace.Consts, ReservedSpace.Pre],
-        args: list[str], line: str, line_index: int, var_owner: str | Literal[ReservedSpace.Main],
+        args: list[str], line: str, line_index: int, var_ref: int, var_type: Type, var_owner: str | Literal[ReservedSpace.Main],
         spaces: SpacesDict, 
     ) -> SpacesDict:
     """Tokenizes variables and puts them as subtokens to either _consts or _pre.\n
@@ -152,7 +152,7 @@ def tokenize_referenced_var(
         var_owner,
         Keyword.VarSet,
         [
-            (Keyword.Refer, reference_value_int)
+            (var_ref, var_type, (Keyword.Refer, reference_value_int))
         ],
         line_index,
         line
@@ -162,7 +162,7 @@ def tokenize_referenced_var(
 
 def tokenize_literal_var(
         space: Literal[ReservedSpace.Consts, ReservedSpace.Pre],
-        args: list[str], line: str, line_index: int, var_type: Type, var_owner: str | Literal[ReservedSpace.Main], 
+        args: list[str], line: str, line_index: int, var_ref: int, var_type: Type, var_owner: str | Literal[ReservedSpace.Main], 
         spaces: SpacesDict,
     ) -> SpacesDict:
     """Literal values put by manually writing initial values inside _consts or _pre rs
@@ -175,7 +175,7 @@ def tokenize_literal_var(
         var_owner,
         Keyword.VarSet,
         [
-            (var_type, var_value)
+            (var_ref, var_type, var_value)
         ],
         line_index,
         line
