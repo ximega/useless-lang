@@ -1,6 +1,5 @@
 #!/usr/bin/python3.13
 
-
 import sys, pprint
 from termcolor import colored
 
@@ -11,25 +10,37 @@ from src.tokens.tokenclass import Token
 from src.tokens.pointer import Pointer
 
 
-def main() -> None:
+def output(lines: list[str]) -> None:
+    tokenizer: Tokenizer = Tokenizer(Pointer(lines))
+    tokens: list[Token] = tokenizer.parse_to_tokens()
+    pprint.pprint(tokens)
+
+def debug(file_name: str) -> None:
     lines: list[str] = []
-
-    file_name: str = sys.argv[1]
-
     if not file_name.endswith(".usl"):
         print("Not a .usl file")
         return
-
     try:
         with open(file_name, "r+") as file:
             lines = file.read().split('\n')
+        output(lines)
+    except FileNotFoundError as exc:
+        print(exc.args[1] + ": " + file_name)
+        return
 
+def compile() -> None:
+    pass
+
+def interpret(file_name: str) -> None:
+    lines: list[str] = []
+    if not file_name.endswith(".usl"):
+        print("Not a .usl file")
+        return
+    try:
+        with open(file_name, "r+") as file:
+            lines = file.read().split('\n')
         try:
-            tokenizer: Tokenizer = Tokenizer(Pointer(lines))
-
-            tokens: list[Token] = tokenizer.parse_to_tokens()
-
-            pprint.pprint(tokens)
+            output(lines)
         except (
             SyntaxException,
             OwnershipException,
@@ -44,11 +55,20 @@ def main() -> None:
                 colored(exc.args[3], "magenta", attrs=["bold"])
             )
             return
-
     except FileNotFoundError as exc:
         print(exc.args[1] + ": " + file_name)
         return
 
+def main() -> None:
+    match sys.argv[1]:
+        case "--debug" | "-d":
+            debug(sys.argv[2])
+        case "--compile" | "-c":
+            pass
+        case "--interpret" | "-i":
+            interpret(sys.argv[2])
+        case _:
+            interpret(sys.argv[1])
 
 if __name__ == "__main__":
     main()
